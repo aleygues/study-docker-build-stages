@@ -1,46 +1,43 @@
-# Getting Started with Create React App
+# Training: Docker build stages
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## My wills
 
-## Available Scripts
+I have a simple React TS app (sorry, I did not customize the app **at all**). 
 
-In the project directory, you can run:
+I want my app to be tested with `cypress`.
 
-### `npm start`
+I want to develop, test and deploy my app using Docker and docker compose.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+I want to keep my 3 docker-compose files, and I would like to optimize my Dockerfile with 2 goals:
+- reducing the size of my image in order to upload it on the Dockerhub (for instance)
+- improve docker build time using the cache
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+## First approaches
 
-### `npm test`
+So far, I've tested two approaches.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Having a big Dockerfile, bullets proof, and changing the command executed each time (depending on if I am testing, livereloading or deploying) in the `docker-compose.yml` file. This approach works pretty well, but the built docker image **is huge: 2.23GB!!**. Since this size is not a problem when I'm working locally, I cannot push an image this big to the Dockerhub! (I can, but I won't). *This is the approach implemented in this repo.*
 
-### `npm run build`
+Having 3 Dockerfiles for each case I want to cover (livereloading, deploying or testing). This is pretty cool because for 2 of my 3 cases, I can start from a `node:alpine` image that is super light! But I have 2 problems with this approach: having 3 Dockerfiles instead of one is not that sexy, and by having 3 Dockerfiles, Docker does not understand how to share build cache between images! As a result, images size are pretty light, but the compilation time is very long because Docker cannot use its cache to make it faster! This approach is not implemented here.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Few thoughts
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+**Why is my image so big?**
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Because if I start my container and navigate into it, I can see that I have `node_modules`, Typescript, Cypress, ..., installed inside. But do I really need these tools to serve a simple static web app? **NO!**
 
-### `npm run eject`
+**Why I cannot use `RUN rm -rf node_modules src` at the end of my Dockerfile?**
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+You may try! But the way Docker images are not that simple. Each command line in a Dockerfile is a layer. An image is a composition of all the layers. If your last command is deleting something, it just appends a new layer in the image, but it won't actually delete the other layers that have the files!
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## How to optimize?
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+I want to optimize my Dockerfile! I just heard of an approach that could help me: **using Docker build stages**. Unfortunetly, I don't have the time to do it! Can you try it for me?
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+From the promises I heard, it should be possible:
+- by working in the `Dockerfile`, by enabling build stages
+- by changing just few things in `docker-compose.yml` files (`.test` and `.prod` also), removing the `command` entry and adding a `target` prop for the build
 
-## Learn More
+**And that's all!**
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+Indeed, I think with this approach, **you should be able to get an Docker image that is about 117MO!**. And that's better. Also, the cache will work to build different kind of images!

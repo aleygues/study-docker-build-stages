@@ -1,0 +1,6 @@
+version: "3"
+
+services: 
+  app:
+    build: .
+    command: "npx concurrently \"http-server ./build -c-1\" \"npx cypress run --config baseUrl=http://localhost:8080\""
